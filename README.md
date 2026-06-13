@@ -1,67 +1,50 @@
-# Hermes Memory System
+# Hermes Memory System ⚠️ 已归档
 
-基于 ChromaDB 的语义记忆系统，替代压缩关键词模式。
+> **状态更新（2026-06-13）：ChromaDB 已从"主要记忆系统"降级为"资料检索库"。**
 
-## 特性
+## 变更说明
 
-- **语义搜索**：基于 embedding 的相似度搜索，不再依赖关键词匹配
-- **自动重要性评分**：记忆自动标记重要性，低重要性记忆定期清理
-- **多类型支持**：支持用户偏好、环境信息、梦境洞察等多种类型
-- **Token 预算控制**：自动控制注入上下文的 token 数量
+旧方案中 ChromaDB 承载了所有记忆功能：用户偏好、环境信息、任务状态、对话历史。这导致了上下文混乱和记忆污染问题（重复回答已解决的问题、旧策略污染当前决策）。
 
-## 安装
+### 新架构
+
+采用分层记忆结构 (`~/.hermes/memory/`)：
+
+```
+core_memory.md      — 长期稳定事实，最高优先级
+task_memory/        — 当前任务状态，每个任务独立文件
+archive/            — 废弃方案、失败方案、历史方案（默认不读取）
+vector_knowledge/   — ChromaDB 仅用于资料检索，不作决策依据
+```
+
+### 优先级规则
+
+> **用户最新明确指令 > core_memory.md > task_memory > vector search > archive**
+
+- ChromaDB 检索结果与 core_memory.md 冲突时 → 以 core_memory.md 为准
+- 旧记忆与用户最新指令冲突时 → 以用户最新指令为准
+- archive 默认禁止读取，除非用户明确要求回顾历史
+
+## 保留功能（降级后）
+
+ChromaDB 仍可作资料检索库使用：
 
 ```bash
-pip install chromadb sentence-transformers
+python3 hermes_memory.py search "关键词"
+python3 hermes_memory.py context "关键词"
 ```
 
-## 使用
+## 不再支持的功能
 
-### Python API
+- ❌ 自动写入对话内容到 ChromaDB
+- ❌ 把 ChromaDB 检索结果当作长期偏好
+- ❌ 通过 ChromaDB 管理任务状态
+- ❌ ChromaDB 作为决策依据
 
-```python
-from hermes_memory import get_memory
+## 历史
 
-mem = get_memory()
-
-# 添加记忆
-mem.add("用户偏好深色主题 UI", {"type": "user_preference", "importance": 0.8})
-
-# 语义搜索
-results = mem.search("UI 设计风格", n_results=5)
-
-# 获取上下文（自动控制 token）
-context = mem.get_context("用户喜欢什么", max_tokens=2000)
-```
-
-### CLI
-
-```bash
-# 添加记忆
-python3 hermes_memory.py add "用户偏好深色主题" "user_preference" 0.8
-
-# 搜索
-python3 hermes_memory.py search "UI 设计" 5
-
-# 获取上下文
-python3 hermes_memory.py context "用户喜欢什么"
-
-# 统计
-python3 hermes_memory.py stats
-
-# 清理旧记忆
-python3 hermes_memory.py cleanup 30
-```
-
-## 数据库位置
-
-`~/.hermes/memory_db/`
-
-## 与 Hermes Agent 集成
-
-1. 在 cron job 中调用 `hermes_memory.py` 存储每日洞察
-2. 在对话开始时调用 `get_context()` 获取相关记忆
-3. 定期调用 `cleanup()` 清理过时记忆
+- **v1.0** (2026-06-10)：基于 ChromaDB 的语义记忆系统
+- **v1.0-archived** (2026-06-13)：降级为资料检索库，改用分层记忆架构
 
 ## License
 
