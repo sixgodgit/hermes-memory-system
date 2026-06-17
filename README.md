@@ -1,51 +1,44 @@
-# Hermes Memory System ⚠️ 已归档
+# Hermes Memory System
 
-> **状态更新（2026-06-13）：ChromaDB 已从"主要记忆系统"降级为"资料检索库"。**
+基于 MemPalace 分析启发的 Hermes Agent 记忆系统优化方案。
 
-## 变更说明
-
-旧方案中 ChromaDB 承载了所有记忆功能：用户偏好、环境信息、任务状态、对话历史。这导致了上下文混乱和记忆污染问题（重复回答已解决的问题、旧策略污染当前决策）。
-
-### 新架构
-
-采用分层记忆结构 (`~/.hermes/memory/`)：
+## 架构
 
 ```
-core_memory.md      — 长期稳定事实，最高优先级
-task_memory/        — 当前任务状态，每个任务独立文件
-archive/            — 废弃方案、失败方案、历史方案（默认不读取）
-vector_knowledge/   — ChromaDB 仅用于资料检索，不作决策依据
+记忆系统
+├── L0 身份协议层（78 tokens）    ← 核心规则注入
+├── L1 AAAK 压缩事实层（142 tokens）← 关键事实 30x 压缩
+├── 织线知识图谱                   ← 三元组 + 时间有效性窗口
+├── ChromaDB 语义搜索后端          ← 替代 TF-IDF，318 条沙粒
+└── Exa 搜索备用                   ← Tavily 挂了自动切
 ```
 
-### 优先级规则
+## 效果
 
-> **用户最新明确指令 > core_memory.md > task_memory > vector search > archive**
+| 指标 | 优化前 | 优化后 |
+|------|--------|--------|
+| 记忆注入 token | 882 chars | 220 tokens（↓75%） |
+| 织线查询 | 全量三元组 | 支持 as_of 时间点 |
+| 语义搜索 | 仅 TF-IDF | TF-IDF + ChromaDB 双后端 |
+| 搜索可用性 | 仅 Tavily | Tavily → Exa 自动 fallback |
 
-- ChromaDB 检索结果与 core_memory.md 冲突时 → 以 core_memory.md 为准
-- 旧记忆与用户最新指令冲突时 → 以用户最新指令为准
-- archive 默认禁止读取，除非用户明确要求回顾历史
+## 文件说明
 
-## 保留功能（降级后）
+| 文件 | 用途 |
+|------|------|
+| `memory_layers/l0_identity.md` | AI 身份、委托协议、对话纪律 |
+| `memory_layers/l1_facts.aaak` | 环境/项目/密钥 AAAK 压缩 |
+| `memory_layers/persona_combined.md` | 合并 L0+L1+gate 的 persona 文件 |
+| `nexsandglass-upgrade/sandglass_chroma.py` | ChromaDB PersistentClient 后端 |
+| `nexsandglass-upgrade/weavethread.py` | 织线知识图谱（含 valid_from/until） |
+| `nexsandglass-upgrade/sandglass_mcp.py` | MCP Server schema（含新参数） |
+| `nexsandglass-upgrade/migrate_to_chromadb.py` | 沙粒 → ChromaDB 迁移脚本 |
+| `compress_memory.py` | MEMORY.md → L0/L1 AAAK 自动压缩 |
+| `switch_memory_layers.sh` | 启用/禁用分层注入 |
+| `tavily_fallback.py` | Tavily 失败自动切 Exa |
 
-ChromaDB 仍可作资料检索库使用：
+## 配合
 
-```bash
-python3 hermes_memory.py search "关键词"
-python3 hermes_memory.py context "关键词"
-```
-
-## 不再支持的功能
-
-- ❌ 自动写入对话内容到 ChromaDB
-- ❌ 把 ChromaDB 检索结果当作长期偏好
-- ❌ 通过 ChromaDB 管理任务状态
-- ❌ ChromaDB 作为决策依据
-
-## 历史
-
-- **v1.0** (2026-06-10)：基于 ChromaDB 的语义记忆系统
-- **v1.0-archived** (2026-06-13)：降级为资料检索库，改用分层记忆架构
-
-## License
-
-CC BY-NC 4.0 - Author: sixgod
+- **Agent**: Hermes Agent (Nous Research)
+- **MCP Server**: NexSandglass（沙漏记忆系统）
+- **启发**: MemPalace (mempalace/mempalace)
